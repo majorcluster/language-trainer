@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply overflow-x-hidden;
+  }
+  
+  body {
+    @apply antialiased overflow-x-hidden;
+    width: 100%;
+    min-width: 320px;
+  }
+  
+  #root {
+    @apply w-full overflow-x-hidden;
+  }
+}
+
+@layer utilities {
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+}
+
