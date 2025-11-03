@@ -57,10 +57,11 @@ export const SUPERLATIVES: WordVariant[] = [
 
 export const DEFAULT_PATTERNS: PhrasePattern[] = [
   {
-    id: 'pattern-1',
+    id: 'pattern-german-1',
     name: 'Going to a place',
+    language: 'german',
     englishTemplate: '{pronoun} went to the {place}',
-    germanTemplate: '{pronoun} ging {prep-phrase}',
+    targetTemplate: '{pronoun} ging {prep-phrase}',
     description: 'Practice accusative case with motion verbs',
     slots: [
       {
@@ -85,10 +86,11 @@ export const DEFAULT_PATTERNS: PhrasePattern[] = [
     ],
   },
   {
-    id: 'pattern-2',
+    id: 'pattern-german-2',
     name: 'Giving something to someone',
+    language: 'german',
     englishTemplate: '{pronoun} gave {possessive} {adjective} {object} to {possessive2} {adjective2} {person}',
-    germanTemplate: '{pronoun} gab {possessive} {adjective} {object} {possessive2} {adjective2} {person}',
+    targetTemplate: '{pronoun} gab {possessive} {adjective} {object} {possessive2} {adjective2} {person}',
     description: 'Practice dative case with indirect objects',
     slots: [
       {

@@ -1,10 +1,6 @@
-import { GeneratedPhrase, PhrasePattern, WordVariant, GrammaticalCase } from '@/types';
-import { 
-  getDefiniteArticle, 
-  declineAdjective, 
-  declinePossessive,
-  mergePrepositionWithArticle
-} from './germanDeclension';
+import { GeneratedPhrase, PhrasePattern, WordVariant, GrammaticalCase, Language } from '@/types';
+import { getDeclensionEngine } from './declension';
+import { mergePrepositionWithArticle } from './declension/german';
 
 function randomChoice<T>(array: T[]): T {
   return array[Math.floor(Math.random() * array.length)];
@@ -17,20 +13,22 @@ function generateId(): string {
 function declineNounPhrase(
   word: WordVariant,
   grammaticalCase: GrammaticalCase,
+  language: Language,
   withPossessive?: string,
   adjective?: WordVariant
 ): string {
   if (!word.gender) return word.baseForm;
 
+  const engine = getDeclensionEngine(language);
   let result = '';
 
   if (withPossessive) {
     // Possessive + adjective + noun
-    const declined = declinePossessive(withPossessive, grammaticalCase, word.gender);
+    const declined = engine.declinePossessive(withPossessive, grammaticalCase, word.gender);
     result = declined;
 
     if (adjective) {
-      const adjectiveDeclined = declineAdjective(
+      const adjectiveDeclined = engine.declineAdjective(
         adjective.baseForm,
         grammaticalCase,
         word.gender,
@@ -40,80 +38,49 @@ function declineNounPhrase(
       result += ' ' + adjectiveDeclined;
     }
   } else {
-    // Article + adjective + noun
-    const article = getDefiniteArticle(grammaticalCase, word.gender);
-    result = article;
+    // Article + adjective + noun (for languages with articles like German)
+    const article = engine.getDefiniteArticle(grammaticalCase, word.gender);
+    if (article) {
+      result = article;
+    }
 
     if (adjective) {
-      const adjectiveDeclined = declineAdjective(
+      const adjectiveDeclined = engine.declineAdjective(
         adjective.baseForm,
         grammaticalCase,
         word.gender,
         'singular',
-        true // weak declension after article
+        !!article // weak declension after article
       );
-      result += ' ' + adjectiveDeclined;
+      if (article) {
+        result += ' ' + adjectiveDeclined;
+      } else {
+        result = adjectiveDeclined;
+      }
     }
   }
 
   result += ' ' + word.baseForm;
-  return result;
+  return result.trim();
 }
 
-function getPronounConjugation(pronoun: string, verb: string): string {
-  // Simple verb conjugation for past tense
-  const conjugations: Record<string, Record<string, string>> = {
-    'ging': {
-      'ich': 'ging',
-      'du': 'gingst',
-      'er': 'ging',
-      'sie': 'ging',
-      'wir': 'gingen',
-      'ihr': 'gingt',
-    },
-    'gab': {
-      'ich': 'gab',
-      'du': 'gabst',
-      'er': 'gab',
-      'sie': 'gab',
-      'wir': 'gaben',
-      'ihr': 'gabt',
-    },
-  };
-
-  return conjugations[verb]?.[pronoun] || verb;
+// Language-agnostic helpers using declension engine
+function translatePronounToEnglish(pronoun: string, language: Language): string {
+  const engine = getDeclensionEngine(language);
+  return engine.translatePronounToEnglish(pronoun);
 }
 
-function translatePronounToEnglish(germanPronoun: string): string {
-  const translations: Record<string, string> = {
-    'ich': 'I',
-    'du': 'you',
-    'er': 'he',
-    'sie': 'she',
-    'es': 'it',
-    'wir': 'we',
-    'ihr': 'you (plural)',
-    'sie-formal': 'you',
-  };
-  return translations[germanPronoun] || germanPronoun;
-}
-
-function translatePossessiveToEnglish(germanPossessive: string): string {
-  const translations: Record<string, string> = {
-    'mein': 'my',
-    'dein': 'your',
-    'sein': 'his',
-    'ihr': 'her',
-    'unser': 'our',
-    'euer': 'your',
-  };
-  return translations[germanPossessive] || germanPossessive;
+function translatePossessiveToEnglish(possessive: string, language: Language): string {
+  const engine = getDeclensionEngine(language);
+  return engine.translatePossessiveToEnglish(possessive);
 }
 
 export function generatePhraseFromPattern(pattern: PhrasePattern): GeneratedPhrase {
   const selectedWords: Record<string, WordVariant> = {};
-  let germanParts: string[] = [];
+  let targetParts: string[] = [];
   let englishParts: string[] = [];
+  const language = pattern.language;
+  const engine = getDeclensionEngine(language);
 
   pattern.slots.forEach((slot) => {
     if (slot.type === 'fixed' && slot.fixedText) {
@@ -125,30 +92,42 @@ export function generatePhraseFromPattern(pattern: PhrasePattern): GeneratedPhra
     }
   });
 
-  // Build German phrase
-  if (pattern.id === 'pattern-1') {
-    // "I went to the cinema" -> "Ich ging ins Kino"
+  // Build phrase based on pattern
+  if (pattern.id === 'pattern-german-1' || pattern.id === 'pattern-czech-1') {
+    // "I went to the cinema" -> "Ich ging ins Kino" (German) or "Já šel do kina" (Czech)
     const pronoun = selectedWords['pronoun'];
-    const place = selectedWords['prep-phrase'];
+    const place = selectedWords['prep-phrase'] || selectedWords['place'];
     
-    const verb = getPronounConjugation(pronoun.baseForm, 'ging');
-    const article = getDefiniteArticle('accusative', place.gender!);
-    const prepPhrase = mergePrepositionWithArticle('in', article);
+    const verbBase = language === 'german' ? 'ging' : 'šel';
+    const verb = engine.conjugateVerb(pronoun.baseForm, verbBase);
     
-    germanParts = [
-      pronoun.baseForm.charAt(0).toUpperCase() + pronoun.baseForm.slice(1),
-      verb,
-      prepPhrase,
-      place.baseForm
-    ];
+    if (language === 'german') {
+      const article = engine.getDefiniteArticle('accusative', place.gender!);
+      const prepPhrase = mergePrepositionWithArticle('in', article);
+      
+      targetParts = [
+        pronoun.baseForm.charAt(0).toUpperCase() + pronoun.baseForm.slice(1),
+        verb,
+        prepPhrase,
+        place.baseForm
+      ];
+    } else {
+      // Czech: do + genitive
+      targetParts = [
+        pronoun.baseForm.charAt(0).toUpperCase() + pronoun.baseForm.slice(1),
+        verb,
+        'do',
+        place.baseForm // Czech nouns decline, would need full declension table
+      ];
+    }
     
     englishParts = [
-      translatePronounToEnglish(pronoun.baseForm),
+      translatePronounToEnglish(pronoun.baseForm, language),
       'went',
       'to the',
       place.english || place.baseForm.toLowerCase()
     ];
-  } else if (pattern.id === 'pattern-2') {
+  } else if (pattern.id === 'pattern-german-2' || pattern.id === 'pattern-czech-2') {
     // Complex giving pattern
     const pronoun = selectedWords['pronoun'];
     const possessive1 = selectedWords['possessive'];
@@ -158,12 +137,14 @@ export function generatePhraseFromPattern(pattern: PhrasePattern): GeneratedPhra
     const adj2 = selectedWords['adjective2'];
     const person = selectedWords['person'];
 
-    const verb = getPronounConjugation(pronoun.baseForm, 'gab');
+    const verbBase = language === 'german' ? 'gab' : 'dal';
+    const verb = engine.conjugateVerb(pronoun.baseForm, verbBase);
     
     // Accusative phrase (direct object)
     const accusativePhrase = declineNounPhrase(
       object,
       'accusative',
+      language,
       possessive1.baseForm,
       adj1
     );
@@ -172,11 +153,12 @@ export function generatePhraseFromPattern(pattern: PhrasePattern): GeneratedPhra
     const dativePhrase = declineNounPhrase(
       person,
       'dative',
+      language,
       possessive2.baseForm,
       adj2
     );
 
-    germanParts = [
+    targetParts = [
       pronoun.baseForm.charAt(0).toUpperCase() + pronoun.baseForm.slice(1),
       verb,
       accusativePhrase,
@@ -184,30 +166,31 @@ export function generatePhraseFromPattern(pattern: PhrasePattern): GeneratedPhra
     ];
 
     englishParts = [
-      translatePronounToEnglish(pronoun.baseForm),
+      translatePronounToEnglish(pronoun.baseForm, language),
       'gave',
-      translatePossessiveToEnglish(possessive1.baseForm),
+      translatePossessiveToEnglish(possessive1.baseForm, language),
       adj1.english || adj1.baseForm,
       object.english || object.baseForm.toLowerCase(),
       'to',
-      translatePossessiveToEnglish(possessive2.baseForm),
+      translatePossessiveToEnglish(possessive2.baseForm, language),
       adj2.english || adj2.baseForm,
       person.english || person.baseForm.toLowerCase()
     ];
   }
 
-  const germanCorrect = germanParts.join(' ');
+  const targetCorrect = targetParts.join(' ');
   const english = englishParts.join(' ');
 
   // Create prompt with base forms (to be declined by user)
-  const germanPrompt = germanCorrect; // For now, show the base forms in UI
+  const targetPrompt = targetCorrect;
 
   return {
     id: generateId(),
     patternId: pattern.id,
+    language,
     english,
-    germanCorrect,
-    germanPrompt,
+    targetCorrect,
+    targetPrompt,
     selectedWords,
   };
 }

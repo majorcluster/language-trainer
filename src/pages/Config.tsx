@@ -5,12 +5,13 @@ import { PatternEditor } from '@/components/PatternEditor';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useStore } from '@/store/useStore';
 import { DEFAULT_PATTERNS } from '@/data/defaultPatterns';
+import { CZECH_PATTERNS } from '@/data/czechPatterns';
 import { generateMultiplePhrases } from '@/utils/phraseGenerator';
 import { Plus, Trash2, RefreshCw, Edit, X } from 'lucide-react';
 import { PhrasePattern, GeneratedPhrase } from '@/types';
 
 export function Config() {
-  const { patterns, addPattern, updatePattern, deletePattern, trainingPhrases } = useStore();
+  const { patterns, addPattern, updatePattern, deletePattern, trainingPhrases, selectedLanguage } = useStore();
   const [initialized, setInitialized] = useState(false);
   const [editingPattern, setEditingPattern] = useState<PhrasePattern | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -22,13 +23,15 @@ export function Config() {
   const [previewPhrases, setPreviewPhrases] = useState<Record<string, GeneratedPhrase[]>>({});
 
   useEffect(() => {
-    // Initialize with default patterns if none exist
-    if (patterns.length === 0 && !initialized) {
-      DEFAULT_PATTERNS.forEach(pattern => addPattern(pattern));
+    // Initialize with default patterns for selected language if none exist
+    const languagePatterns = patterns.filter(p => p.language === selectedLanguage);
+    if (languagePatterns.length === 0 && !initialized) {
+      const defaultPatterns = selectedLanguage === 'german' ? DEFAULT_PATTERNS : CZECH_PATTERNS;
+      defaultPatterns.forEach(pattern => addPattern(pattern));
       setInitialized(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patterns.length, initialized]);
+  }, [patterns.length, initialized, selectedLanguage]);
 
   const handleGeneratePhrases = (patternId: string, count: number = 5) => {
     const pattern = patterns.find(p => p.id === patternId);
@@ -92,7 +95,7 @@ export function Config() {
       </div>
 
       <div className="grid gap-6">
-        {patterns.map((pattern) => (
+        {patterns.filter(p => p.language === selectedLanguage).map((pattern) => (
           <Card key={pattern.id} className="space-y-4">
             <div className="grid grid-cols-[1fr_auto] items-start gap-4">
               <div>
@@ -138,10 +141,10 @@ export function Config() {
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1">
-                  German Template:
+                  {pattern.language === 'german' ? 'German' : 'Czech'} Template:
                 </p>
                 <p className="text-sm font-mono text-gray-900">
-                  {pattern.germanTemplate}
+                  {pattern.targetTemplate}
                 </p>
               </div>
             </div>
@@ -219,7 +222,7 @@ export function Config() {
                             {phrase.english}
                           </p>
                           <p className="text-sm font-semibold text-primary-700">
-                            {phrase.germanCorrect}
+                            {phrase.targetCorrect}
                           </p>
                         </div>
                       </div>
@@ -232,13 +235,16 @@ export function Config() {
         ))}
       </div>
 
-      {patterns.length === 0 && (
+      {patterns.filter(p => p.language === selectedLanguage).length === 0 && (
         <Card className="text-center py-12">
-          <p className="text-gray-500 mb-4">No patterns configured yet</p>
+          <p className="text-gray-500 mb-4">
+            No {selectedLanguage === 'german' ? 'German' : 'Czech'} patterns configured yet
+          </p>
           <Button onClick={() => {
-            DEFAULT_PATTERNS.forEach(pattern => addPattern(pattern));
+            const defaultPatterns = selectedLanguage === 'german' ? DEFAULT_PATTERNS : CZECH_PATTERNS;
+            defaultPatterns.forEach(pattern => addPattern(pattern));
           }}>
-            Load Default Patterns
+            Load Default {selectedLanguage === 'german' ? 'German' : 'Czech'} Patterns
           </Button>
         </Card>
       )}

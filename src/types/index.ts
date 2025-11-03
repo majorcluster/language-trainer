@@ -1,6 +1,17 @@
 // Core types for the language trainer application
 
-export type GrammaticalCase = 'nominative' | 'accusative' | 'dative' | 'genitive';
+export type Language = 'german' | 'czech';
+
+// German has 4 cases, Czech has 7 cases
+export type GrammaticalCase = 
+  | 'nominative' 
+  | 'accusative' 
+  | 'dative' 
+  | 'genitive'
+  | 'vocative'    // Czech only
+  | 'locative'    // Czech only
+  | 'instrumental'; // Czech only
+
 export type Gender = 'masculine' | 'feminine' | 'neuter';
 export type Number = 'singular' | 'plural';
 export type PersonPronoun = 'ich' | 'du' | 'er' | 'sie' | 'es' | 'wir' | 'ihr' | 'sie-formal';
@@ -26,8 +37,9 @@ export interface PhraseSlot {
 export interface PhrasePattern {
   id: string;
   name: string;
+  language: Language;
   englishTemplate: string; // e.g., "{pronoun} went to {place}"
-  germanTemplate: string; // e.g., "{pronoun} ging {preposition} {place}"
+  targetTemplate: string; // e.g., "{pronoun} ging {preposition} {place}" (German/Czech/etc)
   slots: PhraseSlot[];
   description?: string;
 }
@@ -35,9 +47,10 @@ export interface PhrasePattern {
 export interface GeneratedPhrase {
   id: string;
   patternId: string;
+  language: Language;
   english: string;
-  germanCorrect: string;
-  germanPrompt: string; // with words in base form
+  targetCorrect: string; // Correct translation in target language
+  targetPrompt: string; // with words in base form
   selectedWords: Record<string, WordVariant>; // slot id -> selected word
 }
 
@@ -52,9 +65,19 @@ export interface TrainingSession {
 }
 
 export interface AppState {
+  selectedLanguage: Language;
   patterns: PhrasePattern[];
   trainingPhrases: GeneratedPhrase[];
   sessions: TrainingSession[];
   currentPhrase: GeneratedPhrase | null;
+}
+
+export interface LanguageConfig {
+  id: Language;
+  name: string;
+  nativeName: string;
+  cases: GrammaticalCase[];
+  hasGenders: boolean;
+  genders: Gender[];
 }
 

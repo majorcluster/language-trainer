@@ -81,10 +81,10 @@ export function Phrases() {
                 
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">
-                    German (Correct Answer):
+                    {phrase.language === 'german' ? 'German' : 'Czech'} (Correct Answer):
                   </p>
                   <p className="text-lg font-semibold text-primary-700">
-                    {phrase.germanCorrect}
+                    {phrase.targetCorrect}
                   </p>
                 </div>
 

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, PhrasePattern, GeneratedPhrase, TrainingSession } from '@/types';
+import { AppState, PhrasePattern, GeneratedPhrase, TrainingSession, Language } from '@/types';
 
 interface StoreState extends AppState {
   // Actions
+  setLanguage: (language: Language) => void;
+  
   addPattern: (pattern: PhrasePattern) => void;
   updatePattern: (id: string, pattern: Partial<PhrasePattern>) => void;
   deletePattern: (id: string) => void;
@@ -19,10 +21,14 @@ interface StoreState extends AppState {
 export const useStore = create<StoreState>()(
   persist(
     (set) => ({
+      selectedLanguage: 'german' as Language,
       patterns: [],
       trainingPhrases: [],
       sessions: [],
       currentPhrase: null,
+      
+      setLanguage: (language) =>
+        set({ selectedLanguage: language, currentPhrase: null }),
       
       addPattern: (pattern) => 
         set((state) => {
@@ -68,12 +74,13 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'language-trainer-storage',
-      version: 3, // Increment this when data structure changes
+      version: 4, // Increment this when data structure changes
       migrate: (persistedState: unknown, version: number) => {
-        if (version < 3) {
-          // Clear old patterns to load new meaningful word categories
+        if (version < 4) {
+          // Add multi-language support
           return {
             ...(persistedState as Record<string, unknown>),
+            selectedLanguage: 'german',
             patterns: [],
             trainingPhrases: [],
           };

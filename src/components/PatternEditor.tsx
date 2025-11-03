@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { PhrasePattern, PhraseSlot, WordVariant, GrammaticalCase, Gender } from '@/types';
+import { PhrasePattern, PhraseSlot, WordVariant, GrammaticalCase, Gender, Language } from '@/types';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Card } from './Card';
 import { ConfirmModal } from './ConfirmModal';
+import { LANGUAGES } from '@/config/languages';
 import { X, Plus, Trash2 } from 'lucide-react';
 
 interface PatternEditorProps {
@@ -17,8 +18,9 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
     pattern || {
       id: `pattern-${Date.now()}`,
       name: '',
+      language: 'german',
       englishTemplate: '',
-      germanTemplate: '',
+      targetTemplate: '',
       description: '',
       slots: [],
     }
@@ -105,7 +107,7 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.englishTemplate || !formData.germanTemplate) {
+    if (!formData.name || !formData.englishTemplate || !formData.targetTemplate) {
       alert('Please fill in all required fields');
       return;
     }
@@ -130,6 +132,23 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
           </div>
 
           <div className="pattern-editor-basic-info space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Language *
+              </label>
+              <select
+                value={formData.language}
+                onChange={(e) => setFormData({ ...formData, language: e.target.value as Language })}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                {Object.values(LANGUAGES).map(lang => (
+                  <option key={lang.id} value={lang.id}>
+                    {lang.name} ({lang.nativeName})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <Input
               label="Pattern Name *"
               value={formData.name}
@@ -156,9 +175,9 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
             />
 
             <Input
-              label="German Template *"
-              value={formData.germanTemplate}
-              onChange={(e) => setFormData({ ...formData, germanTemplate: e.target.value })}
+              label={`${LANGUAGES[formData.language]?.name || 'Target'} Template *`}
+              value={formData.targetTemplate}
+              onChange={(e) => setFormData({ ...formData, targetTemplate: e.target.value })}
               placeholder="e.g., {pronoun} ging {prep-phrase}"
               required
             />

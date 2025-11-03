@@ -5,8 +5,9 @@ import { Button } from '@/components/Button';
 import { useStore } from '@/store/useStore';
 
 export function Home() {
-  const { patterns, sessions, trainingPhrases } = useStore();
+  const { patterns, sessions, trainingPhrases, selectedLanguage } = useStore();
   
+  const languagePatterns = patterns.filter(p => p.language === selectedLanguage);
   const totalSessions = sessions.length;
   const correctSessions = sessions.filter(s => s.isCorrect).length;
   const accuracy = totalSessions > 0 
@@ -20,7 +21,7 @@ export function Home() {
           Welcome to Language Trainer
         </h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Master German declension through practice. Build custom phrase patterns and train with real-world examples.
+          Master {selectedLanguage === 'german' ? 'German' : 'Czech'} declension through practice. Build custom phrase patterns and train with real-world examples.
         </p>
       </div>
 
@@ -31,10 +32,10 @@ export function Home() {
             <Settings className="w-6 h-6 text-primary-600" />
           </div>
           <p className="text-3xl font-bold text-primary-600 mb-2">
-            {patterns.length}
+            {languagePatterns.length}
           </p>
           <p className="text-sm text-gray-600 mb-4">
-            Active phrase patterns configured
+            {selectedLanguage === 'german' ? 'German' : 'Czech'} patterns configured
           </p>
           <Link to="/config">
             <Button variant="secondary" className="w-full">
