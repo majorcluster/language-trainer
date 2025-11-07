@@ -4,10 +4,12 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { useStore } from '@/store/useStore';
 import { generatePhraseFromPattern, checkAnswer } from '@/utils/phraseGenerator';
+import { getLanguageConfig } from '@/config/languages';
 import { CheckCircle2, XCircle, RefreshCw, Lightbulb } from 'lucide-react';
 
 export function Train() {
-  const { patterns, addSession, currentPhrase, setCurrentPhrase, addTrainingPhrase, trainingPhrases } = useStore();
+  const { patterns, addSession, currentPhrase, setCurrentPhrase, addTrainingPhrase, trainingPhrases, selectedLanguage, verbs } = useStore();
+  const languageConfig = getLanguageConfig(selectedLanguage);
   const [userAnswer, setUserAnswer] = useState('');
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error' | null;
@@ -24,14 +26,15 @@ export function Train() {
   }, [patterns.length, currentPhrase]);
 
   const generateNewPhrase = () => {
-    if (patterns.length === 0) return;
+    const languagePatterns = patterns.filter(p => p.language === selectedLanguage);
+    if (languagePatterns.length === 0) return;
     
-    const randomPattern = patterns[Math.floor(Math.random() * patterns.length)];
-    const phrase = generatePhraseFromPattern(randomPattern);
+    const randomPattern = languagePatterns[Math.floor(Math.random() * languagePatterns.length)];
+    const phrase = generatePhraseFromPattern(randomPattern, verbs);
     
     // Check if this phrase already exists in trainingPhrases
     const phraseExists = trainingPhrases.some(
-      tp => tp.germanCorrect === phrase.germanCorrect && tp.english === phrase.english
+      tp => tp.targetCorrect === phrase.targetCorrect && tp.english === phrase.english
     );
     
     // Add to training phrases if it doesn't exist
@@ -51,7 +54,11 @@ export function Train() {
     
     if (!currentPhrase || !userAnswer.trim()) return;
 
-    const isCorrect = checkAnswer(userAnswer, currentPhrase.germanCorrect);
+    const isCorrect = checkAnswer(
+      userAnswer, 
+      currentPhrase.targetCorrect,
+      currentPhrase.targetWithoutPronoun
+    );
     const newAttempts = attempts + 1;
     setAttempts(newAttempts);
 
@@ -65,7 +72,7 @@ export function Train() {
         id: `${Date.now()}-${Math.random()}`,
         phraseId: currentPhrase.id,
         userAnswer,
-        correctAnswer: currentPhrase.germanCorrect,
+        correctAnswer: currentPhrase.targetCorrect,
         isCorrect: true,
         timestamp: Date.now(),
         attempts: newAttempts,
@@ -92,7 +99,7 @@ export function Train() {
         id: `${Date.now()}-${Math.random()}`,
         phraseId: currentPhrase.id,
         userAnswer: userAnswer || '(skipped)',
-        correctAnswer: currentPhrase.germanCorrect,
+        correctAnswer: currentPhrase.targetCorrect,
         isCorrect: false,
         timestamp: Date.now(),
         attempts: attempts + 1,
@@ -101,15 +108,17 @@ export function Train() {
     generateNewPhrase();
   };
 
-  if (patterns.length === 0) {
+  const languagePatterns = patterns.filter(p => p.language === selectedLanguage);
+  
+  if (languagePatterns.length === 0) {
     return (
       <div className="max-w-2xl mx-auto">
         <Card className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            No Patterns Configured
+            No {languageConfig.name} Patterns Configured
           </h2>
           <p className="text-gray-600 mb-6">
-            You need to configure at least one phrase pattern before you can start training.
+            You need to configure at least one {languageConfig.name} phrase pattern before you can start training.
           </p>
           <Button onClick={() => window.location.href = '/config'}>
             Go to Configuration
@@ -152,7 +161,7 @@ export function Train() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Your German Translation:"
+            label={`Your ${getLanguageConfig(currentPhrase.language).name} Translation:`}
             value={userAnswer}
             onChange={(e) => setUserAnswer(e.target.value)}
             placeholder="Type your answer here..."
@@ -185,7 +194,13 @@ export function Train() {
                 <div>
                   <p className="font-medium text-yellow-900 mb-1">Hint:</p>
                   <p className="text-sm text-yellow-800">
-                    The correct answer is: <span className="font-semibold">{currentPhrase.germanCorrect}</span>
+                    The correct answer is: <span className="font-semibold">{currentPhrase.targetCorrect}</span>
+                    {currentPhrase.targetWithoutPronoun && (
+                      <>
+                        <br />
+                        Or (without pronoun): <span className="font-semibold">{currentPhrase.targetWithoutPronoun}</span>
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -223,8 +238,17 @@ export function Train() {
           Tip
         </h3>
         <p className="text-sm text-blue-800">
-          Pay attention to the grammatical case required by prepositions and verbs. 
-          Articles and adjectives must match the gender, case, and number of the noun.
+          {languageConfig.allowPronounDrop ? (
+            <>
+              {languageConfig.name} allows omitting subject pronouns! Both "Já šel do kina" and "Šel do kina" are correct.
+              Pay attention to case endings on nouns and adjectives.
+            </>
+          ) : (
+            <>
+              Pay attention to the grammatical case required by prepositions and verbs. 
+              Articles and adjectives must match the gender, case, and number of the noun.
+            </>
+          )}
         </p>
       </Card>
     </div>

@@ -1,12 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, PhrasePattern, GeneratedPhrase, TrainingSession } from '@/types';
+import { AppState, PhrasePattern, GeneratedPhrase, TrainingSession, Language, VerbConjugation } from '@/types';
 
 interface StoreState extends AppState {
   // Actions
+  setLanguage: (language: Language) => void;
+  
   addPattern: (pattern: PhrasePattern) => void;
   updatePattern: (id: string, pattern: Partial<PhrasePattern>) => void;
   deletePattern: (id: string) => void;
+  
+  addVerb: (verb: VerbConjugation) => void;
+  updateVerb: (id: string, verb: Partial<VerbConjugation>) => void;
+  deleteVerb: (id: string) => void;
   
   addTrainingPhrase: (phrase: GeneratedPhrase) => void;
   removeTrainingPhrase: (id: string) => void;
@@ -19,10 +25,15 @@ interface StoreState extends AppState {
 export const useStore = create<StoreState>()(
   persist(
     (set) => ({
+      selectedLanguage: 'german' as Language,
       patterns: [],
+      verbs: [],
       trainingPhrases: [],
       sessions: [],
       currentPhrase: null,
+      
+      setLanguage: (language) =>
+        set({ selectedLanguage: language, currentPhrase: null }),
       
       addPattern: (pattern) => 
         set((state) => {
@@ -43,6 +54,27 @@ export const useStore = create<StoreState>()(
       deletePattern: (id) =>
         set((state) => ({
           patterns: state.patterns.filter((p) => p.id !== id),
+        })),
+      
+      addVerb: (verb) =>
+        set((state) => {
+          // Prevent duplicate verb IDs
+          if (state.verbs.some(v => v.id === verb.id)) {
+            return state;
+          }
+          return { verbs: [...state.verbs, verb] };
+        }),
+      
+      updateVerb: (id, updates) =>
+        set((state) => ({
+          verbs: state.verbs.map((v) => 
+            v.id === id ? { ...v, ...updates } : v
+          ),
+        })),
+      
+      deleteVerb: (id) =>
+        set((state) => ({
+          verbs: state.verbs.filter((v) => v.id !== id),
         })),
       
       addTrainingPhrase: (phrase) =>
@@ -68,13 +100,16 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'language-trainer-storage',
-      version: 3, // Increment this when data structure changes
+      version: 5, // Increment this when data structure changes
       migrate: (persistedState: unknown, version: number) => {
-        if (version < 3) {
-          // Clear old patterns to load new meaningful word categories
+        if (version < 5) {
+          // Add verb conjugation system
+          const state = persistedState as Record<string, unknown>;
           return {
-            ...(persistedState as Record<string, unknown>),
+            ...state,
+            selectedLanguage: (state.selectedLanguage as Language) || 'german',
             patterns: [],
+            verbs: [],
             trainingPhrases: [],
           };
         }

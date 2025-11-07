@@ -3,10 +3,12 @@ import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useStore } from '@/store/useStore';
+import { getLanguageConfig } from '@/config/languages';
 import { Trash2, Languages } from 'lucide-react';
 
 export function Phrases() {
-  const { trainingPhrases, patterns, removeTrainingPhrase } = useStore();
+  const { trainingPhrases, patterns, removeTrainingPhrase, selectedLanguage } = useStore();
+  const languageConfig = getLanguageConfig(selectedLanguage);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     phraseId: string | null;
@@ -26,7 +28,9 @@ export function Phrases() {
     return patterns.find(p => p.id === patternId)?.name || 'Unknown Pattern';
   };
 
-  if (trainingPhrases.length === 0) {
+  const languagePhrases = trainingPhrases.filter(p => p.language === selectedLanguage);
+
+  if (languagePhrases.length === 0) {
     return (
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
@@ -41,10 +45,10 @@ export function Phrases() {
         <Card className="text-center py-12">
           <Languages className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            No Phrases Yet
+            No {languageConfig.name} Phrases Yet
           </h2>
           <p className="text-gray-600 mb-6">
-            Go to Configuration and generate some phrases from your patterns
+            Start training to automatically generate {languageConfig.name} phrases
           </p>
           <Button onClick={() => window.location.href = '/config'}>
             Go to Configuration
@@ -61,12 +65,12 @@ export function Phrases() {
           Generated Phrases
         </h1>
         <p className="text-gray-600">
-          {trainingPhrases.length} practice {trainingPhrases.length === 1 ? 'phrase' : 'phrases'} ready for training
+          {languagePhrases.length} {languageConfig.name} practice {languagePhrases.length === 1 ? 'phrase' : 'phrases'} ready for training
         </p>
       </div>
 
       <div className="grid gap-4">
-        {trainingPhrases.map((phrase) => (
+        {languagePhrases.map((phrase) => (
           <Card key={phrase.id} className="phrase-card">
             <div className="grid grid-cols-[1fr_auto] items-start gap-4">
               <div className="space-y-3">
@@ -81,11 +85,16 @@ export function Phrases() {
                 
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">
-                    German (Correct Answer):
+                    {getLanguageConfig(phrase.language).name} (Correct Answer):
                   </p>
                   <p className="text-lg font-semibold text-primary-700">
-                    {phrase.germanCorrect}
+                    {phrase.targetCorrect}
                   </p>
+                  {phrase.targetWithoutPronoun && (
+                    <p className="text-sm text-primary-600 mt-1">
+                      Or: {phrase.targetWithoutPronoun}
+                    </p>
+                  )}
                 </div>
 
                 <div className="pt-2 border-t border-gray-200">
