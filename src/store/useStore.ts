@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, PhrasePattern, GeneratedPhrase, TrainingSession, Language } from '@/types';
+import { AppState, PhrasePattern, GeneratedPhrase, TrainingSession, Language, VerbConjugation } from '@/types';
 
 interface StoreState extends AppState {
   // Actions
@@ -9,6 +9,10 @@ interface StoreState extends AppState {
   addPattern: (pattern: PhrasePattern) => void;
   updatePattern: (id: string, pattern: Partial<PhrasePattern>) => void;
   deletePattern: (id: string) => void;
+  
+  addVerb: (verb: VerbConjugation) => void;
+  updateVerb: (id: string, verb: Partial<VerbConjugation>) => void;
+  deleteVerb: (id: string) => void;
   
   addTrainingPhrase: (phrase: GeneratedPhrase) => void;
   removeTrainingPhrase: (id: string) => void;
@@ -23,6 +27,7 @@ export const useStore = create<StoreState>()(
     (set) => ({
       selectedLanguage: 'german' as Language,
       patterns: [],
+      verbs: [],
       trainingPhrases: [],
       sessions: [],
       currentPhrase: null,
@@ -51,6 +56,27 @@ export const useStore = create<StoreState>()(
           patterns: state.patterns.filter((p) => p.id !== id),
         })),
       
+      addVerb: (verb) =>
+        set((state) => {
+          // Prevent duplicate verb IDs
+          if (state.verbs.some(v => v.id === verb.id)) {
+            return state;
+          }
+          return { verbs: [...state.verbs, verb] };
+        }),
+      
+      updateVerb: (id, updates) =>
+        set((state) => ({
+          verbs: state.verbs.map((v) => 
+            v.id === id ? { ...v, ...updates } : v
+          ),
+        })),
+      
+      deleteVerb: (id) =>
+        set((state) => ({
+          verbs: state.verbs.filter((v) => v.id !== id),
+        })),
+      
       addTrainingPhrase: (phrase) =>
         set((state) => ({
           trainingPhrases: [...state.trainingPhrases, phrase],
@@ -74,14 +100,16 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'language-trainer-storage',
-      version: 4, // Increment this when data structure changes
+      version: 5, // Increment this when data structure changes
       migrate: (persistedState: unknown, version: number) => {
-        if (version < 4) {
-          // Add multi-language support
+        if (version < 5) {
+          // Add verb conjugation system
+          const state = persistedState as Record<string, unknown>;
           return {
-            ...(persistedState as Record<string, unknown>),
-            selectedLanguage: 'german',
+            ...state,
+            selectedLanguage: (state.selectedLanguage as Language) || 'german',
             patterns: [],
+            verbs: [],
             trainingPhrases: [],
           };
         }

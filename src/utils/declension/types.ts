@@ -1,4 +1,4 @@
-import { GrammaticalCase, Gender, Number as GrammaticalNumber } from '@/types';
+import { GrammaticalCase, Gender, Number as GrammaticalNumber, VerbConjugation } from '@/types';
 
 export interface DeclensionEngine {
   getDefiniteArticle(
@@ -10,6 +10,13 @@ export interface DeclensionEngine {
   getIndefiniteArticle(
     grammaticalCase: GrammaticalCase,
     gender: Gender
+  ): string;
+
+  declineNoun(
+    noun: string,
+    grammaticalCase: GrammaticalCase,
+    gender: Gender,
+    number?: GrammaticalNumber
   ): string;
 
   declineAdjective(
@@ -29,7 +36,9 @@ export interface DeclensionEngine {
 
   conjugateVerb(
     pronoun: string,
-    verb: string
+    verbId: string,
+    verbs: VerbConjugation[],
+    subjectGender?: Gender
   ): string;
 
   translatePronounToEnglish(pronoun: string): string;

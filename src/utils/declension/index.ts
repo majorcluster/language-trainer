@@ -1,17 +1,10 @@
 import { Language } from '@/types';
 import { DeclensionEngine } from './types';
-import { germanDeclension } from './german';
-import { czechDeclension } from './czech';
+import { getLanguageConfig } from '@/config/languages';
 
 export function getDeclensionEngine(language: Language): DeclensionEngine {
-  switch (language) {
-    case 'german':
-      return germanDeclension;
-    case 'czech':
-      return czechDeclension;
-    default:
-      return germanDeclension;
-  }
+  const languageConfig = getLanguageConfig(language);
+  return languageConfig.declensionEngine;
 }
 
 export * from './types';

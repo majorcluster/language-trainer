@@ -1,13 +1,17 @@
 import { Link } from 'react-router-dom';
-import { BookOpen, Settings, TrendingUp, FileText } from 'lucide-react';
+import { BookOpen, Settings, TrendingUp, FileText, Zap } from 'lucide-react';
 import { Card } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { useStore } from '@/store/useStore';
+import { getLanguageConfig } from '@/config/languages';
 
 export function Home() {
-  const { patterns, sessions, trainingPhrases, selectedLanguage } = useStore();
+  const { patterns, sessions, trainingPhrases, selectedLanguage, verbs } = useStore();
+  const languageConfig = getLanguageConfig(selectedLanguage);
   
   const languagePatterns = patterns.filter(p => p.language === selectedLanguage);
+  const languagePhrases = trainingPhrases.filter(p => p.language === selectedLanguage);
+  const languageVerbs = verbs.filter(v => v.language === selectedLanguage);
   const totalSessions = sessions.length;
   const correctSessions = sessions.filter(s => s.isCorrect).length;
   const accuracy = totalSessions > 0 
@@ -21,11 +25,11 @@ export function Home() {
           Welcome to Language Trainer
         </h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Master {selectedLanguage === 'german' ? 'German' : 'Czech'} declension through practice. Build custom phrase patterns and train with real-world examples.
+          Master {languageConfig.name} declension through practice. Build custom phrase patterns and train with real-world examples.
         </p>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card>
           <div className="grid grid-cols-[1fr_auto] items-center gap-4 mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Patterns</h3>
@@ -35,7 +39,7 @@ export function Home() {
             {languagePatterns.length}
           </p>
           <p className="text-sm text-gray-600 mb-4">
-            {selectedLanguage === 'german' ? 'German' : 'Czech'} patterns configured
+            {languageConfig.name} patterns configured
           </p>
           <Link to="/config">
             <Button variant="secondary" className="w-full">
@@ -68,14 +72,32 @@ export function Home() {
             <FileText className="w-6 h-6 text-primary-600" />
           </div>
           <p className="text-3xl font-bold text-primary-600 mb-2">
-            {trainingPhrases.length}
+            {languagePhrases.length}
           </p>
           <p className="text-sm text-gray-600 mb-4">
-            Ready for practice
+            {languageConfig.name} ready for practice
           </p>
           <Link to="/phrases">
             <Button variant="secondary" className="w-full">
               View Phrases
+            </Button>
+          </Link>
+        </Card>
+
+        <Card>
+          <div className="grid grid-cols-[1fr_auto] items-center gap-4 mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Verbs</h3>
+            <Zap className="w-6 h-6 text-primary-600" />
+          </div>
+          <p className="text-3xl font-bold text-primary-600 mb-2">
+            {languageVerbs.length}
+          </p>
+          <p className="text-sm text-gray-600 mb-4">
+            Conjugation tables available
+          </p>
+          <Link to="/verbs">
+            <Button variant="secondary" className="w-full">
+              Manage Verbs
             </Button>
           </Link>
         </Card>

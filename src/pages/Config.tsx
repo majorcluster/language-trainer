@@ -4,14 +4,14 @@ import { Button } from '@/components/Button';
 import { PatternEditor } from '@/components/PatternEditor';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useStore } from '@/store/useStore';
-import { DEFAULT_PATTERNS } from '@/data/defaultPatterns';
-import { CZECH_PATTERNS } from '@/data/czechPatterns';
 import { generateMultiplePhrases } from '@/utils/phraseGenerator';
+import { getLanguageConfig } from '@/config/languages';
 import { Plus, Trash2, RefreshCw, Edit, X } from 'lucide-react';
 import { PhrasePattern, GeneratedPhrase } from '@/types';
 
 export function Config() {
-  const { patterns, addPattern, updatePattern, deletePattern, trainingPhrases, selectedLanguage } = useStore();
+  const { patterns, addPattern, updatePattern, deletePattern, trainingPhrases, selectedLanguage, verbs, addVerb } = useStore();
+  const languageConfig = getLanguageConfig(selectedLanguage);
   const [initialized, setInitialized] = useState(false);
   const [editingPattern, setEditingPattern] = useState<PhrasePattern | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -23,21 +23,27 @@ export function Config() {
   const [previewPhrases, setPreviewPhrases] = useState<Record<string, GeneratedPhrase[]>>({});
 
   useEffect(() => {
-    // Initialize with default patterns for selected language if none exist
+    // Initialize with default patterns and verbs for selected language if none exist
     const languagePatterns = patterns.filter(p => p.language === selectedLanguage);
+    const languageVerbs = verbs.filter(v => v.language === selectedLanguage);
+    
     if (languagePatterns.length === 0 && !initialized) {
-      const defaultPatterns = selectedLanguage === 'german' ? DEFAULT_PATTERNS : CZECH_PATTERNS;
-      defaultPatterns.forEach(pattern => addPattern(pattern));
+      languageConfig.defaultPatterns.forEach(pattern => addPattern(pattern));
+    }
+    
+    if (languageVerbs.length === 0 && !initialized) {
+      // Load default verbs
+      languageConfig.defaultVerbs.forEach(verb => addVerb(verb));
       setInitialized(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patterns.length, initialized, selectedLanguage]);
+  }, [patterns.length, verbs.length, initialized, selectedLanguage]);
 
   const handleGeneratePhrases = (patternId: string, count: number = 5) => {
     const pattern = patterns.find(p => p.id === patternId);
     if (!pattern) return;
 
-    const newPhrases = generateMultiplePhrases(pattern, count);
+    const newPhrases = generateMultiplePhrases(pattern, count, verbs);
     setPreviewPhrases(prev => ({
       ...prev,
       [patternId]: newPhrases
@@ -97,7 +103,7 @@ export function Config() {
       <div className="grid gap-6">
         {patterns.filter(p => p.language === selectedLanguage).map((pattern) => (
           <Card key={pattern.id} className="space-y-4">
-            <div className="grid grid-cols-[1fr_auto] items-start gap-4">
+            <div className="pattern-card-header grid grid-cols-1 sm:grid-cols-[1fr_auto] items-start gap-3">
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   {pattern.name}
@@ -108,24 +114,24 @@ export function Config() {
                   </p>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="pattern-card-actions grid grid-cols-2 gap-2">
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => setEditingPattern(pattern)}
-                  className="gap-2"
+                  className="gap-1 px-3"
                 >
                   <Edit className="w-4 h-4" />
-                  Edit
+                  <span className="hidden sm:inline">Edit</span>
                 </Button>
                 <Button
                   variant="danger"
                   size="sm"
                   onClick={() => handleDeletePattern(pattern.id, pattern.name)}
-                  className="gap-2"
+                  className="gap-1 px-3"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete
+                  <span className="hidden sm:inline">Delete</span>
                 </Button>
               </div>
             </div>
@@ -135,15 +141,15 @@ export function Config() {
                 <p className="text-xs font-medium text-gray-500 mb-1">
                   English Template:
                 </p>
-                <p className="text-sm font-mono text-gray-900">
+                <p className="text-sm font-mono text-gray-900 break-words">
                   {pattern.englishTemplate}
                 </p>
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 mb-1">
-                  {pattern.language === 'german' ? 'German' : 'Czech'} Template:
+                  {getLanguageConfig(pattern.language).name} Template:
                 </p>
-                <p className="text-sm font-mono text-gray-900">
+                <p className="text-sm font-mono text-gray-900 break-words">
                   {pattern.targetTemplate}
                 </p>
               </div>
@@ -157,12 +163,12 @@ export function Config() {
                 {pattern.slots.map((slot) => (
                   <div
                     key={slot.id}
-                    className="bg-white border border-gray-200 rounded-lg p-3"
+                    className="bg-white border border-gray-200 rounded-lg p-3 overflow-hidden"
                   >
-                    <p className="text-sm font-medium text-gray-900 mb-1">
+                    <p className="text-sm font-medium text-gray-900 mb-1 break-words">
                       {slot.label}
                     </p>
-                    <div className="grid grid-flow-col auto-cols-max gap-2 text-xs text-gray-500">
+                    <div className="flex flex-wrap gap-2 text-xs text-gray-500">
                       <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded">
                         {slot.type}
                       </span>
@@ -171,9 +177,24 @@ export function Config() {
                           {slot.requiredCase}
                         </span>
                       )}
+                      {slot.verbId && (
+                        <span className="text-gray-400">
+                          {verbs.find(v => v.id === slot.verbId)?.infinitive || slot.verbId}
+                        </span>
+                      )}
+                      {slot.preposition && (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded font-mono">
+                          {slot.preposition}
+                        </span>
+                      )}
                       {slot.options && (
                         <span className="text-gray-400">
                           {slot.options.length} options
+                        </span>
+                      )}
+                      {slot.fixedText && (
+                        <span className="text-gray-400 font-mono">
+                          "{slot.fixedText}"
                         </span>
                       )}
                     </div>
@@ -238,13 +259,13 @@ export function Config() {
       {patterns.filter(p => p.language === selectedLanguage).length === 0 && (
         <Card className="text-center py-12">
           <p className="text-gray-500 mb-4">
-            No {selectedLanguage === 'german' ? 'German' : 'Czech'} patterns configured yet
+            No {languageConfig.name} patterns configured yet
           </p>
           <Button onClick={() => {
-            const defaultPatterns = selectedLanguage === 'german' ? DEFAULT_PATTERNS : CZECH_PATTERNS;
-            defaultPatterns.forEach(pattern => addPattern(pattern));
+            languageConfig.defaultPatterns.forEach(pattern => addPattern(pattern));
+            languageConfig.defaultVerbs.forEach(verb => addVerb(verb));
           }}>
-            Load Default {selectedLanguage === 'german' ? 'German' : 'Czech'} Patterns
+            Load Default {languageConfig.name} Patterns
           </Button>
         </Card>
       )}
@@ -257,7 +278,7 @@ export function Config() {
                 Generated Phrases Ready
               </h3>
               <p className="text-sm text-green-800">
-                You have {trainingPhrases.length} practice {trainingPhrases.length === 1 ? 'phrase' : 'phrases'} ready to use in training.
+                You have {trainingPhrases.length} {languageConfig.name} practice {trainingPhrases.length === 1 ? 'phrase' : 'phrases'} ready to use in training.
               </p>
             </div>
             <Button

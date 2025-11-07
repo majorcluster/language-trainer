@@ -3,6 +3,7 @@ import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { Train } from './pages/Train';
 import { Phrases } from './pages/Phrases';
+import { Verbs } from './pages/Verbs';
 import { Config } from './pages/Config';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/train" element={<Train />} />
           <Route path="/phrases" element={<Phrases />} />
+          <Route path="/verbs" element={<Verbs />} />
           <Route path="/config" element={<Config />} />
         </Routes>
       </Layout>

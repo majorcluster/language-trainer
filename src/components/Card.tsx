@@ -11,7 +11,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={clsx(
-          'rounded-xl p-6',
+          'rounded-xl p-4 sm:p-6',
           {
             'bg-white shadow-lg': variant === 'default',
             'bg-white border-2 border-gray-200': variant === 'bordered',

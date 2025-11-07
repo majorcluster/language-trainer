@@ -1,18 +1,125 @@
-import { GrammaticalCase, Gender, Number as GrammaticalNumber } from '@/types';
+import { GrammaticalCase, Gender, Number as GrammaticalNumber, VerbConjugation } from '@/types';
 import { DeclensionEngine } from './types';
-
-// Czech doesn't use articles, but we'll implement the interface for consistency
-// In Czech, case is shown through noun and adjective endings
 
 export const czechDeclension: DeclensionEngine = {
   getDefiniteArticle(): string {
-    // Czech has no articles
     return '';
   },
 
   getIndefiniteArticle(): string {
-    // Czech has no articles
     return '';
+  },
+
+  declineNoun(
+    noun: string,
+    grammaticalCase: GrammaticalCase,
+    gender: Gender,
+    number: GrammaticalNumber = 'singular'
+  ): string {
+    if (number === 'plural') {
+      // Simple plural rules - could be enhanced
+      if (noun.endsWith('a')) return noun.slice(0, -1) + 'y';
+      if (noun.endsWith('o')) return noun.slice(0, -1) + 'a';
+      return noun + 'y';
+    }
+
+    // Locative case endings for common patterns
+    const locativeEndings: Record<string, (noun: string) => string> = {
+      'masculine': (n: string) => {
+        if (n.endsWith('ek')) return n.slice(0, -2) + 'ku';
+        if (n.endsWith('k')) return n.slice(0, -1) + 'ku';
+        if (n.endsWith('h')) return n.slice(0, -1) + 'hu';
+        if (n.endsWith('g')) return n.slice(0, -1) + 'gu';
+        if (n.endsWith('ch')) return n + 'u';
+        return n + 'u';
+      },
+      'feminine': (n: string) => {
+        if (n.endsWith('ice')) return n.slice(0, -1);
+        if (n.endsWith('e')) return n.slice(0, -1) + 'ě';
+        if (n.endsWith('a')) return n.slice(0, -1) + 'ě';
+        if (n.endsWith('ost')) return n.slice(0, -2) + 'sti';
+        return n + 'ě';
+      },
+      'neuter': (n: string) => {
+        if (n.endsWith('o')) return n.slice(0, -1) + 'ě';
+        if (n.endsWith('í')) return n + 'm';
+        return n + 'u';
+      },
+    };
+
+    // Genitive case endings
+    const genitiveEndings: Record<string, (noun: string) => string> = {
+      'masculine': (n: string) => {
+        if (n.endsWith('ek')) return n.slice(0, -2) + 'ku';
+        return n + 'u';
+      },
+      'feminine': (n: string) => {
+        if (n.endsWith('ice')) return n;
+        if (n.endsWith('e')) return n.slice(0, -1);
+        if (n.endsWith('a')) return n.slice(0, -1) + 'y';
+        return n;
+      },
+      'neuter': (n: string) => {
+        if (n.endsWith('o')) return n.slice(0, -1) + 'a';
+        return n + 'a';
+      },
+    };
+
+    // Dative case endings
+    const dativeEndings: Record<string, (noun: string) => string> = {
+      'masculine': (n: string) => n + 'u',
+      'feminine': (n: string) => {
+        if (n.endsWith('a')) return n.slice(0, -1) + 'ě';
+        if (n.endsWith('e')) return n.slice(0, -1) + 'i';
+        return n;
+      },
+      'neuter': (n: string) => {
+        if (n.endsWith('o')) return n.slice(0, -1) + 'u';
+        return n + 'u';
+      },
+    };
+
+    // Accusative case endings
+    const accusativeEndings: Record<string, (noun: string) => string> = {
+      'masculine': (n: string) => n, // inanimate masculine = nominative
+      'feminine': (n: string) => {
+        if (n.endsWith('a')) return n.slice(0, -1) + 'u';
+        return n;
+      },
+      'neuter': (n: string) => n, // = nominative
+    };
+
+    // Instrumental case endings
+    const instrumentalEndings: Record<string, (noun: string) => string> = {
+      'masculine': (n: string) => n + 'em',
+      'feminine': (n: string) => {
+        if (n.endsWith('a')) return n.slice(0, -1) + 'ou';
+        if (n.endsWith('e')) return n.slice(0, -1) + 'í';
+        return n;
+      },
+      'neuter': (n: string) => {
+        if (n.endsWith('o')) return n.slice(0, -1) + 'em';
+        return n + 'em';
+      },
+    };
+
+    // Apply declension based on case
+    switch (grammaticalCase) {
+      case 'locative':
+        return locativeEndings[gender](noun);
+      case 'genitive':
+        return genitiveEndings[gender](noun);
+      case 'dative':
+        return dativeEndings[gender](noun);
+      case 'accusative':
+        return accusativeEndings[gender](noun);
+      case 'instrumental':
+        return instrumentalEndings[gender](noun);
+      case 'vocative':
+      case 'nominative':
+      default:
+        return noun;
+    }
   },
 
   declineAdjective(
@@ -72,32 +179,62 @@ export const czechDeclension: DeclensionEngine = {
     gender: Gender,
     number: GrammaticalNumber = 'singular'
   ): string {
-    // Czech possessives decline like adjectives
-    return this.declineAdjective(possessive, grammaticalCase, gender, number, false);
+    // Indeclinable possessives (jeho, její, jejich)
+    const indeclinable = ['jeho', 'její', 'jejich'];
+    if (indeclinable.includes(possessive.toLowerCase())) {
+      return possessive;
+    }
+    
+    // Declinable possessives (můj, tvůj, náš, váš) decline like adjectives
+    return czechDeclension.declineAdjective(possessive, grammaticalCase, gender, number, false);
   },
 
-  conjugateVerb(pronoun: string, verb: string): string {
+  conjugateVerb(
+    pronoun: string, 
+    verbId: string, 
+    verbs: VerbConjugation[],
+    subjectGender?: Gender
+  ): string {
+    // Find the verb conjugation table
+    const verbTable = verbs.find(v => v.id === verbId || v.infinitive === verbId);
+    
+    if (verbTable) {
+      // For Czech past tense with gender forms
+      if (verbTable.genderForms && subjectGender) {
+        const genderForm = verbTable.genderForms[subjectGender];
+        if (genderForm && genderForm[pronoun]) {
+          return genderForm[pronoun];
+        }
+      }
+      
+      // Use default conjugations
+      if (verbTable.conjugations[pronoun]) {
+        return verbTable.conjugations[pronoun];
+      }
+    }
+    
+    // Fallback to old hardcoded conjugations for backwards compatibility
     const conjugations: Record<string, Record<string, string>> = {
-      'šel': { // went (masculine)
-        'já': 'šel',
-        'ty': 'šel',
+      'šel': {
+        'já': 'šel jsem',
+        'ty': 'šel jsi',
         'on': 'šel',
         'ona': 'šla',
-        'my': 'šli',
-        'vy': 'šli',
+        'my': 'šli jsme',
+        'vy': 'šli jste',
         'oni': 'šli',
       },
-      'dal': { // gave
-        'já': 'dal',
-        'ty': 'dal',
+      'dal': {
+        'já': 'dal jsem',
+        'ty': 'dal jsi',
         'on': 'dal',
         'ona': 'dala',
-        'my': 'dali',
-        'vy': 'dali',
+        'my': 'dali jsme',
+        'vy': 'dali jste',
         'oni': 'dali',
       },
     };
-    return conjugations[verb]?.[pronoun] || verb;
+    return conjugations[verbId]?.[pronoun] || verbId;
   },
 
   translatePronounToEnglish(czechPronoun: string): string {

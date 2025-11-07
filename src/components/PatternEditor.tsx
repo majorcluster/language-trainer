@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { PhrasePattern, PhraseSlot, WordVariant, GrammaticalCase, Gender, Language } from '@/types';
+import { useState, useRef, useEffect } from 'react';
+import { PhrasePattern, PhraseSlot, WordVariant, GrammaticalCase, Gender } from '@/types';
 import { Button } from './Button';
 import { Input } from './Input';
+import { Select, SelectItem } from './Select';
 import { Card } from './Card';
 import { ConfirmModal } from './ConfirmModal';
-import { LANGUAGES } from '@/config/languages';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { useStore } from '@/store/useStore';
+import { getLanguageConfig } from '@/config/languages';
+import { X, Plus, Trash2, UserPlus } from 'lucide-react';
 
 interface PatternEditorProps {
   pattern?: PhrasePattern;
@@ -14,11 +16,12 @@ interface PatternEditorProps {
 }
 
 export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps) {
+  const { verbs, selectedLanguage } = useStore();
   const [formData, setFormData] = useState<PhrasePattern>(
     pattern || {
       id: `pattern-${Date.now()}`,
       name: '',
-      language: 'german',
+      language: selectedLanguage,
       englishTemplate: '',
       targetTemplate: '',
       description: '',
@@ -37,17 +40,56 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
     wordIndex: number | null;
   }>({ isOpen: false, slotIndex: null, wordIndex: null });
 
+  const [lastAddedSlotIndex, setLastAddedSlotIndex] = useState<number | null>(null);
+  const [lastAddedWord, setLastAddedWord] = useState<{ slotIndex: number; wordIndex: number } | null>(null);
+  const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const wordRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const wordInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  useEffect(() => {
+    if (lastAddedSlotIndex !== null && slotRefs.current[lastAddedSlotIndex]) {
+      slotRefs.current[lastAddedSlotIndex]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+      setLastAddedSlotIndex(null);
+    }
+  }, [lastAddedSlotIndex]);
+
+  useEffect(() => {
+    if (lastAddedWord !== null) {
+      const key = `${lastAddedWord.slotIndex}-${lastAddedWord.wordIndex}`;
+      const wordElement = wordRefs.current[key];
+      const inputElement = wordInputRefs.current[key];
+      
+      if (wordElement) {
+        wordElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+        
+        // Focus the first input field after scrolling
+        setTimeout(() => {
+          inputElement?.focus();
+        }, 300); // Wait for scroll animation
+      }
+      setLastAddedWord(null);
+    }
+  }, [lastAddedWord]);
+
   const handleAddSlot = () => {
     const newSlot: PhraseSlot = {
       id: `slot-${Date.now()}`,
-      type: 'noun-phrase',
+      type: 'object-phrase',
       label: 'New Slot',
       options: [],
     };
+    const newSlots = [...formData.slots, newSlot];
     setFormData({
       ...formData,
-      slots: [...formData.slots, newSlot],
+      slots: newSlots,
     });
+    setLastAddedSlotIndex(newSlots.length - 1);
   };
 
   const handleUpdateSlot = (index: number, updates: Partial<PhraseSlot>) => {
@@ -75,8 +117,12 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
       category: 'noun',
     };
     const newSlots = [...formData.slots];
-    newSlots[slotIndex].options = [...(newSlots[slotIndex].options || []), newWord];
+    const currentOptions = newSlots[slotIndex].options || [];
+    newSlots[slotIndex].options = [...currentOptions, newWord];
     setFormData({ ...formData, slots: newSlots });
+    
+    // Scroll to the newly added word
+    setLastAddedWord({ slotIndex, wordIndex: currentOptions.length });
   };
 
   const handleUpdateWord = (
@@ -95,6 +141,20 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
     setDeleteWordConfirm({ isOpen: true, slotIndex, wordIndex });
   };
 
+  const handleAddAllPronouns = (slotIndex: number) => {
+    const newSlots = [...formData.slots];
+    const languageConfig = getLanguageConfig(formData.language);
+    const defaultPronouns = languageConfig.defaultPronounWords;
+    const existingOptions = newSlots[slotIndex].options || [];
+    
+    // Merge with existing, avoiding duplicates by ID
+    const existingIds = new Set(existingOptions.map(opt => opt.id));
+    const newPronouns = defaultPronouns.filter(pron => !existingIds.has(pron.id));
+    
+    newSlots[slotIndex].options = [...existingOptions, ...newPronouns];
+    setFormData({ ...formData, slots: newSlots });
+  };
+
   const confirmDeleteWord = () => {
     if (deleteWordConfirm.slotIndex !== null && deleteWordConfirm.wordIndex !== null) {
       const newSlots = [...formData.slots];
@@ -111,12 +171,31 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
       alert('Please fill in all required fields');
       return;
     }
-    onSave(formData);
+    
+    // Filter out incomplete words (missing baseForm or english)
+    const cleanedSlots = formData.slots.map(slot => {
+      if (!slot.options) return slot;
+      
+      const validWords = slot.options.filter(word => {
+        // Keep words that have both baseForm and english filled
+        const hasBaseForm = word.baseForm && word.baseForm.trim() !== '';
+        const hasEnglish = word.english && word.english.trim() !== '';
+        const isPronoun = word.category === 'pronoun';
+        
+        return hasBaseForm && (hasEnglish || isPronoun);
+      });
+      
+      return { ...slot, options: validWords };
+    });
+    
+    onSave({ ...formData, slots: cleanedSlots });
   };
 
+  const currentLanguageConfig = getLanguageConfig(formData.language);
+
   return (
-    <div className="pattern-editor-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <Card className="pattern-editor-modal max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto pt-0 pb-0">
+    <div className="pattern-editor-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="pattern-editor-modal max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-lg p-6 pt-0 pb-0">
         <form onSubmit={handleSubmit} className="pattern-editor-form space-y-6">
           <div className="pattern-editor-header flex justify-between items-center sticky top-0 bg-white pb-4 border-b pt-4">
             <h2 className="text-2xl font-bold text-gray-900">
@@ -132,23 +211,6 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
           </div>
 
           <div className="pattern-editor-basic-info space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Language *
-              </label>
-              <select
-                value={formData.language}
-                onChange={(e) => setFormData({ ...formData, language: e.target.value as Language })}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                {Object.values(LANGUAGES).map(lang => (
-                  <option key={lang.id} value={lang.id}>
-                    {lang.name} ({lang.nativeName})
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <Input
               label="Pattern Name *"
               value={formData.name}
@@ -175,7 +237,7 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
             />
 
             <Input
-              label={`${LANGUAGES[formData.language]?.name || 'Target'} Template *`}
+              label={`${getLanguageConfig(formData.language).name} Template *`}
               value={formData.targetTemplate}
               onChange={(e) => setFormData({ ...formData, targetTemplate: e.target.value })}
               placeholder="e.g., {pronoun} ging {prep-phrase}"
@@ -195,7 +257,14 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
             </div>
 
             {formData.slots.map((slot, slotIndex) => (
-              <Card key={slot.id} variant="bordered" className="slot-card space-y-3">
+              <Card 
+                key={slot.id} 
+                variant="bordered" 
+                className="slot-card space-y-3"
+                ref={(el) => {
+                  slotRefs.current[slotIndex] = el;
+                }}
+              >
                 <div className="slot-header grid grid-cols-[1fr_auto] items-start gap-4">
                   <div className="slot-inputs grid sm:grid-cols-2 gap-3">
                     <Input
@@ -228,48 +297,51 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
                 </div>
 
                 <div className="slot-config grid sm:grid-cols-2 gap-3">
-                  <div className="slot-type-selector">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Slot Type
-                    </label>
-                    <select
+                  <Select
+                    label="Slot Type"
                       value={slot.type}
-                      onChange={(e) =>
-                        handleUpdateSlot(slotIndex, {
-                          type: e.target.value as PhraseSlot['type'],
-                        })
-                      }
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
-                    >
-                      <option value="pronoun">Pronoun</option>
-                      <option value="noun-phrase">Noun Phrase</option>
-                      <option value="preposition-phrase">Preposition Phrase</option>
-                      <option value="verb">Verb</option>
-                      <option value="fixed">Fixed Text</option>
-                    </select>
-                  </div>
+                    onChange={(value) =>
+                      handleUpdateSlot(slotIndex, {
+                        type: value as PhraseSlot['type'],
+                      })
+                    }
+                    className="text-sm"
+                  >
+                    <SelectItem value="pronoun">Pronoun</SelectItem>
+                    <SelectItem value="object-phrase">Object Phrase</SelectItem>
+                    <SelectItem value="verb">Verb</SelectItem>
+                    <SelectItem value="fixed">Fixed Text</SelectItem>
+                  </Select>
 
                   {slot.type !== 'fixed' && (
-                    <div className="case-selector">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Required Case
-                      </label>
-                      <select
-                        value={slot.requiredCase || ''}
-                        onChange={(e) =>
-                          handleUpdateSlot(slotIndex, {
-                            requiredCase: e.target.value ? (e.target.value as GrammaticalCase) : undefined,
+                    <Select
+                      label="Required Case"
+                      value={slot.requiredCase || undefined}
+                      onChange={(value) =>
+                        handleUpdateSlot(slotIndex, {
+                          requiredCase: value as GrammaticalCase | undefined,
                           })
                         }
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
-                      >
-                        <option value="">None</option>
-                        <option value="nominative">Nominative</option>
-                        <option value="accusative">Accusative</option>
-                        <option value="dative">Dative</option>
-                        <option value="genitive">Genitive</option>
-                      </select>
-                    </div>
+                      className="text-sm"
+                      placeholder="None"
+                    >
+                      <SelectItem value="nominative">Nominative</SelectItem>
+                      <SelectItem value="accusative">Accusative</SelectItem>
+                      <SelectItem value="dative">Dative</SelectItem>
+                      <SelectItem value="genitive">Genitive</SelectItem>
+                    </Select>
+                  )}
+
+                  {slot.type === 'object-phrase' && (
+                    <Input
+                      label="Preposition (optional)"
+                      value={slot.preposition || ''}
+                      onChange={(e) =>
+                        handleUpdateSlot(slotIndex, { preposition: e.target.value })
+                      }
+                      placeholder={`e.g., ${currentLanguageConfig.examples.prepositions} (leave empty for direct object)`}
+                      className="text-sm"
+                    />
                   )}
 
                   {slot.type === 'fixed' && (
@@ -279,28 +351,65 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
                       onChange={(e) =>
                         handleUpdateSlot(slotIndex, { fixedText: e.target.value })
                       }
-                      placeholder="e.g., ging"
+                      placeholder="e.g., to"
                       className="text-sm"
                     />
                   )}
+
+                  {slot.type === 'verb' && (
+                    <Select
+                      label="Select Verb"
+                      value={slot.verbId || undefined}
+                      onChange={(value) =>
+                        handleUpdateSlot(slotIndex, { verbId: value })
+                        }
+                      className="text-sm"
+                      placeholder="Choose a verb..."
+                    >
+                        {verbs
+                          .filter(v => v.language === formData.language)
+                          .map(verb => (
+                          <SelectItem key={verb.id} value={verb.id}>
+                              {verb.infinitive} ({verb.tense}) - {verb.english}
+                          </SelectItem>
+                          ))}
+                    </Select>
+                  )}
                 </div>
 
-                {slot.type !== 'fixed' && (
+                {slot.type !== 'fixed' && slot.type !== 'verb' && (
                   <div className="word-options-section space-y-2">
-                    <div className="word-options-header grid grid-cols-[1fr_auto] items-center gap-4">
+                    <div className="word-options-header grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] items-start sm:items-center gap-2">
                       <label className="text-sm font-medium text-gray-700">
                         Word Options ({slot.options?.length || 0})
                       </label>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleAddWord(slotIndex)}
-                        className="gap-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Add Word
-                      </Button>
+                      <div className="word-options-buttons grid grid-cols-[1fr_1fr] gap-1 sm:grid-cols-2 sm:gap-2 sm:contents">
+                        {slot.type === 'pronoun' && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddAllPronouns(slotIndex)}
+                            className="gap-1 text-xs px-2"
+                            title="Add all default pronouns"
+                          >
+                            <UserPlus className="w-3 h-3" />
+                            <span className="hidden sm:inline">All Pronouns</span>
+                            <span className="inline sm:hidden text-xs">All</span>
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleAddWord(slotIndex)}
+                          className="gap-1 px-2"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span className="hidden sm:inline">Add Word</span>
+                          <span className="inline sm:hidden text-xs">Add</span>
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="word-options-list space-y-2 max-h-60 overflow-y-auto">
@@ -308,6 +417,9 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
                         <div
                           key={word.id}
                           className="word-option-item bg-gray-50 p-3 rounded-lg space-y-2"
+                          ref={(el) => {
+                            wordRefs.current[`${slotIndex}-${wordIndex}`] = el;
+                          }}
                         >
                           <div className="word-inputs grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2">
                             <input
@@ -320,6 +432,9 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
                               }
                               placeholder="German (e.g., Kino)"
                               className="word-german-input px-2 py-1 rounded border border-gray-300 text-sm"
+                              ref={(el) => {
+                                wordInputRefs.current[`${slotIndex}-${wordIndex}`] = el;
+                              }}
                             />
                             <input
                               type="text"
@@ -372,7 +487,7 @@ export function PatternEditor({ pattern, onSave, onCancel }: PatternEditorProps)
             <Button type="submit">Save Pattern</Button>
           </div>
         </form>
-      </Card>
+      </div>
 
       <ConfirmModal
         isOpen={deleteSlotConfirm.isOpen}

@@ -1,4 +1,4 @@
-import { GrammaticalCase, Gender, Number as GrammaticalNumber } from '@/types';
+import { GrammaticalCase, Gender, Number as GrammaticalNumber, VerbConjugation } from '@/types';
 import { DeclensionEngine } from './types';
 
 // German article declensions
@@ -36,6 +36,7 @@ const INDEFINITE_ARTICLES: Record<string, string> = {
   'genitive_neuter_singular': 'eines',
 };
 
+// Possessive pronouns follow ein-word declension (as determiners before nouns)
 const POSSESSIVE_ENDINGS: Record<string, string> = {
   'nominative_masculine_singular': '',
   'nominative_feminine_singular': 'e',
@@ -114,6 +115,44 @@ export const germanDeclension: DeclensionEngine = {
     return INDEFINITE_ARTICLES[key] || 'ein';
   },
 
+  declineNoun(
+    noun: string,
+    grammaticalCase: GrammaticalCase,
+    gender: Gender,
+    number: GrammaticalNumber = 'singular'
+  ): string {
+    // German nouns mostly don't change except:
+    // 1. Dative plural adds -n (if not already ending in n/s)
+    // 2. Genitive masculine/neuter singular sometimes adds -s/-es
+    // 3. N-declension masculine nouns add -en in all cases except nominative
+    
+    if (number === 'plural') {
+      if (grammaticalCase === 'dative' && !noun.endsWith('n') && !noun.endsWith('s')) {
+        return noun + 'n';
+      }
+      return noun;
+    }
+
+    // Genitive case for masculine/neuter
+    if (grammaticalCase === 'genitive' && (gender === 'masculine' || gender === 'neuter')) {
+      // Short nouns (1 syllable) often add -es, longer ones add -s
+      // This is a simplification
+      return noun + 's';
+    }
+
+    // N-declension (weak masculine nouns) - simplified
+    // Words like: Student, Mensch, Junge, Herr
+    // These add -(e)n in all cases except nominative singular
+    const nDeclensionWords = ['student', 'mensch', 'junge', 'herr', 'kunde'];
+    if (gender === 'masculine' && 
+        grammaticalCase !== 'nominative' && 
+        nDeclensionWords.some(w => noun.toLowerCase().includes(w))) {
+      return noun + 'en';
+    }
+
+    return noun;
+  },
+
   declineAdjective(
     adjective: string,
     grammaticalCase: GrammaticalCase,
@@ -146,7 +185,20 @@ export const germanDeclension: DeclensionEngine = {
     return base + ending;
   },
 
-  conjugateVerb(pronoun: string, verb: string): string {
+  conjugateVerb(
+    pronoun: string, 
+    verbId: string, 
+    verbs: VerbConjugation[],
+    _subjectGender?: Gender
+  ): string {
+    // Find the verb conjugation table
+    const verbTable = verbs.find(v => v.id === verbId || v.infinitive === verbId);
+    
+    if (verbTable && verbTable.conjugations[pronoun]) {
+      return verbTable.conjugations[pronoun];
+    }
+    
+    // Fallback to old hardcoded conjugations for backwards compatibility
     const conjugations: Record<string, Record<string, string>> = {
       'ging': {
         'ich': 'ging',
@@ -165,7 +217,7 @@ export const germanDeclension: DeclensionEngine = {
         'ihr': 'gabt',
       },
     };
-    return conjugations[verb]?.[pronoun] || verb;
+    return conjugations[verbId]?.[pronoun] || verbId;
   },
 
   translatePronounToEnglish(germanPronoun: string): string {
